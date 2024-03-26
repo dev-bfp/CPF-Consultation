@@ -1,5 +1,7 @@
 # CPF-Consultation
 
+O código foi criado para automatizar o processo de consulta de restrição no CPF na plataforma ACIB (Banco de dados SCPC) 
+
 Este código utiliza várias bibliotecas e algoritmos para automatizar o processo de consulta de dados em uma planilha do Google Sheets e interagir com um site usando Selenium. Aqui está um resumo das principais:
 
 Bibliotecas:
