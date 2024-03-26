@@ -284,6 +284,6 @@ print('Check Completed ' + str(datetime.today().strftime('%d/%m/%Y %H:%M')))
 msg_end = send_msg2("🆗!")
 sheet.update_acell('I2', datetime.today().strftime('%d/%m/%Y %H:%M'))
 
-time.sleep(2)
+time.sleep(1)
 delete_msg(msg_start)
 delete_msg(msg_end)
