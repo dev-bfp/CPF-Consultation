@@ -271,17 +271,17 @@ def selenium(x):
 
 print('Starting Check ' + datetime.today().strftime('%H:%M'))
 msg_start = send_msg2("🔎🔎")
-# send_msg("🔎🔎")
+
 rz1 = sheet.range(2, 2, 10000, 2)
 rz2 = sheet.range(2, 3, 10000, 3)
 rz3 = sheet.range(2, 4, 10000, 4)
 rz4 = sheet.range(2, 5, 10000, 5)
 rz5 = sheet.range(2, 6, 10000, 6)
 rz6 = sheet.range(2, 7, 10000, 7)
+
 lphr()
 print('Check Completed ' + str(datetime.today().strftime('%d/%m/%Y %H:%M')))
 msg_end = send_msg2("🆗!")
-# send_msg("🆗")
 sheet.update_acell('I2', datetime.today().strftime('%d/%m/%Y %H:%M'))
 
 time.sleep(2)
