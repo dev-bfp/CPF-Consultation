@@ -2,6 +2,8 @@ import time
 import pyautogui
 import pprint
 import requests
+import gspread # LIB DO GOOGLE SHEETS
+from oauth2client.service_account import ServiceAccountCredentials # LIB DE AUTENTICAÇÃO DA GOOGLE
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -10,6 +12,14 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from Tokens import *
+
+# Configuração credencial GoogleApis
+scope = ["https://www.googleapis.com/auth/drive"]
+credentials_google = ServiceAccountCredentials.from_json_keyfile_name(caminho_local_credentials, scope)
+client = gspread.authorize(credentials_google)
+# Endereçamento GoogleSheets
+nmSheets = "Vendas Automaticas"
+sheet = client.open(nmSheets).worksheet("Consulta CPF")
 
 
 class Selenium():    
@@ -117,23 +127,32 @@ def login_ixc(driver):
     Selenium.click('id', 'entrar')  # clica em entrar
     time.sleep(1)
     try:
-
-        Selenium.click('id','entrar')  # clica em entrar
+        try:
+            Selenium.click('id','entrar')  # clica em entrar
+            time.sleep(1)
+        except:
+            time.sleep(0.5)
+            
         try:
             driver.implicitly_wait(10)  # seconds
             Selenium.click('xpath','//*[@id="slide_0"]/div[4]/vg-button')  # fecha pop-up
+            time.sleep(0.5)
             Selenium.click('xpath','//*[@id="slide_1"]/div[4]/vg-button[2]')
-
         except:
             time.sleep(0.5)
-    except:
+            
         try:
-            driver.implicitly_wait(10)  # seconds
+            driver.implicitly_wait(5)  # seconds
             Selenium.click('xpath','//*[@id="warning"]/vg-body/div/vg-button[2]')  # fecha pop-up
         except:
-            time.sleep(1)
-            print('Erro login')
-            driver.quit()
+            time.sleep(0.5)
+
+        usuario = Selenium.find('xpath','//*[@id="layout_painel"]/div[2]/span').strip().split(' ')
+        print(f'Welcome, {usuario[0]} {usuario[-1]}')
+        
+    except:
+        print('Erro login')
+        
     # ------------------- Fim -------------------
 
 def consulta_serasa(CPF):
@@ -143,7 +162,7 @@ def consulta_serasa(CPF):
     Selenium.click('xpath','//*[@id="grupo_menu04400d48d04acd3599cf545dafbb90ed"]/ul/li[1]/a') # clica na opção
     Selenium.click('xpath','//*[@id="1_grid"]/div/div[2]/div[1]/button[1]') # clica em novo
     Selenium.clear('id','cnpj_cpf') # limpa o campo
-    time.sleep(1)
+    time.sleep(0.1)
     for x in CPF:
         Selenium.sendtext('id','cnpj_cpf',x) # insere o CPF
     Selenium.sendtext('id','cnpj_cpf',Keys.TAB) # Tecla TAB
@@ -162,14 +181,21 @@ def extracao_dados(tabela):
 '''
     def dados_cadastrais():
         dados_cadastrais = {}
+        try:
+            dados_cadastrais['Data da Consulta'] = Selenium.find('xpath','//*[@id="QUADRO_ENTRADA-T1"]/tbody/tr[2]/td')
+            dados_cadastrais['Código de Resposta'] = Selenium.find('xpath','//*[@id="QUADRO_ENTRADA-T1"]/tbody/tr[3]/td')
+        except:
+            dados_cadastrais['Data da Consulta'] = datetime.today().strftime('%d/%m/%Y %H:%M')
+            dados_cadastrais['Código de Resposta'] = 'Não informado'
+                    
         for x in range(1,10):
             driver.implicitly_wait(0.1)  # seconds
             try:
                 xpa = '//*[@id="CONFIRMEI-T1"]/tbody/tr[{}]/th'.format(x)
                 tabela = Selenium.find('xpath',xpa).replace(':','')
-                print(tabela)
+                # print(tabela)
                 result = Selenium.find('xpath','//*[@id="CONFIRMEI-T1"]/tbody/tr[{}]/td'.format(x))
-                print(result)
+                print(f'{tabela}: {result}')
                 dados_cadastrais[tabela] = result
             except:
                 print('End')
@@ -232,47 +258,92 @@ def algoritmo_CPF(array):
     return qtd,valor_total,data_ultimo_registro
     # ------------------- Fim -------------------
 
-aprovado = None
-driver = start()
-login_ixc(driver)
-time.sleep(2)
-cpf = input('Insira o CPF: ')
-consulta_serasa(cpf)
-dados_cadastrais = extracao_dados('dados cadastrais')
-ocorrencias = extracao_dados('ocorrencias')
-resumo = {}
-resumo['Dados Cadastrais'] = dados_cadastrais
-resumo['Informações Restritivas'] = ocorrencias
-analise_restricao = algoritmo_CPF(resumo['Informações Restritivas'])
+def start_serasa_consulting(driver,cpf,numero_linha):
 
-qtd_registros = analise_restricao[0] if analise_restricao[0] > 0 else ''
-valor_aberto = analise_restricao[1]
-if valor_aberto > 0 or qtd_registros > 0:
-    aprovado = '🚫🚫🚫 Com restrição 🚫🚫🚫'
-else:
-    aprovado = '✅✅✅ Sem restrição ✅✅✅'
-
-ultimo_registro = analise_restricao[2]
-valor_aberto = f'R$ {valor_aberto:_.2f}'
-valor_aberto = valor.replace('.',',').replace('_','.')
-if aprovado == '🚫🚫🚫 Com restrição 🚫🚫🚫':
-    resumo_final = f'Possui {qtd_registros} registros no valor total de {valor_aberto}' 
-else:
-    resumo_final = ''
-
-mensagem = (f'''------- *Serasa* -------
-
-Data: {'adefinir'}
-Código consulta: {'adefinir'}
-CPF: {resumo['Dados Cadastrais']['CPF']}
-Nome: {resumo['Dados Cadastrais']['Nome/Razão Social']}
-Data de nascimento: {resumo['Dados Cadastrais']['Data de Nascimento']}
-Situação Receita Federal: {resumo['Dados Cadastrais']['Situação']}
-
-Status: {aprovado}
-
-{resumo_final}
-''')
-send_msg2(mensagem)
-
+    aprovado = None
+    login_ixc(driver)
+    time.sleep(1)
+    consulta_serasa(cpf)
     
+    try:
+        erro = Selenium.find('id','ERROS_B900-H2')
+        sheet.update_acell('G' + str(numero_linha), erro)
+        print(erro)
+        driver.quit()
+        exit()
+
+    except:
+        resumo = {}
+        resumo['Dados Cadastrais'] = extracao_dados('dados cadastrais')
+        resumo['Informações Restritivas'] = extracao_dados('ocorrencias')
+        analise_restricao = algoritmo_CPF(resumo['Informações Restritivas'])
+        qtd_registros = analise_restricao[0] if analise_restricao[0] > 0 else 0
+        valor_aberto = analise_restricao[1]
+        if valor_aberto > 0 or qtd_registros > 0:
+            aprovado = '🚫🚫🚫 Com restrição 🚫🚫🚫'
+            ultimo_registro = analise_restricao[2]
+            valor_aberto = f'R$ {valor_aberto:_.2f}'
+            valor_aberto = valor_aberto.replace('.',',').replace('_','.')
+            resumo_final = f'Possui {qtd_registros} registros no valor total de {valor_aberto}'
+        else:
+            aprovado = '✅✅✅ Sem restrição ✅✅✅'
+            resumo_final = ''
+            
+        dados_para_mensagem = ['CPF','Nome/Razão Social','Data de Nascimento','Situação', 'Data da Consulta','Código de Resposta']
+
+        for tipo_dados in dados_para_mensagem:
+            try:
+                dado = resumo['Dados Cadastrais'][tipo_dados]
+                print(dado)
+            except:
+                try:    
+                    if tipo_dados == 'CPF':
+                        info = Selenium.find('xpath','//*[@id="QUADRO_ENTRADA-T1"]/tbody/tr[4]/td')
+                        resumo['Dados Cadastrais']['CPF'] = info.split('<br>')[0].replace('CPF ','')
+
+                    elif tipo_dados == 'Nome/Razão Social':
+                        info = Selenium.find('xpath','//*[@id="QUADRO_ENTRADA-T1"]/tbody/tr[4]/td')
+                        resumo['Dados Cadastrais']['CPF'] = info.split('<br>')[1]
+                        
+                except:
+                    if tipo_dados == 'CPF':
+                        resumo['Dados Cadastrais']['CPF'] = 'Não informado'
+
+                    elif tipo_dados == 'Nome/Razão Social':
+                        resumo['Dados Cadastrais']['Nome/Razão Social'] = 'Não informado'
+                    
+                    
+                if tipo_dados == 'Data de Nascimento':
+                    resumo['Dados Cadastrais']['Data de Nascimento'] = 'Não informado'
+                    
+                elif tipo_dados == 'Situação':
+                    resumo['Dados Cadastrais']['Situação'] = 'Não informado'
+
+                elif tipo_dados == 'Data da Consulta':
+                    resumo['Dados Cadastrais']['Data da Consulta'] = datetime.today().strftime('%d/%m/%Y %H:%M')
+
+                elif tipo_dados == 'Código de Resposta':
+                    resumo['Dados Cadastrais']['Código de Resposta'] = 'Não informado'
+
+
+        mensagem = f'''Consulta *2* de *2* - *SERASA*
+
+    Data e hora: {resumo['Dados Cadastrais']['Data da Consulta']}
+    Código consulta: {resumo['Dados Cadastrais']['Código de Resposta']}
+
+    CPF Consultado: {resumo['Dados Cadastrais']['CPF']}
+    Nome: {resumo['Dados Cadastrais']['Nome/Razão Social']}
+    Data de nascimento: {resumo['Dados Cadastrais']['Data de Nascimento']}
+    Receita Federal: {resumo['Dados Cadastrais']['Situação']}
+
+    Status: {aprovado}
+
+    {resumo_final}'''
+        sheet.update_acell('G' + str(numero_linha), aprovado)
+        send_msg2(mensagem)
+        driver.quit()
+        exit()
+    
+
+driver = start()
+

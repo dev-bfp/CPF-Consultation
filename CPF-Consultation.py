@@ -132,7 +132,10 @@ def selenium(x):
             # driver.find_element(by=By.XPATH, value='/html/body/div[2]/div/div[1]/div/ul/li[1]/a/span').send_keys(Keys.ESCAPE)
 
             time.sleep(5)
-
+            try: 
+                driver.find_element(by=By.XPATH, value='/html/body/div[4]/div/div/a').click()
+            except: 
+                pass
             driver.find_element(by=By.XPATH, value='/html/body/div[2]/div/div[1]/div/ul/li[1]/a/span').click()
             time.sleep(2)
             driver.find_element(by=By.XPATH,
